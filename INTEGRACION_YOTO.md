@@ -13,7 +13,7 @@ La opción **Buscar movimiento localizado y formas destacadas** divide la imagen
 La interfaz presenta dos opciones comprensibles para el público:
 
 1. **Selección local privada:** no utiliza IA ni envía imágenes. Prioriza nitidez, diferencias visuales y movimiento localizado.
-2. **Analizar con Gemini · clave propia:** el usuario pega una clave de Google AI Studio. La clave permanece únicamente en la memoria de la pestaña; no se guarda en cookies, almacenamiento local, archivos ni descargas. El filtro local reduce previamente las capturas que se envían.
+2. **Analizar con Gemini, OpenAI o Claude:** el usuario elige un proveedor y pega su propia clave API. La clave permanece únicamente en la memoria de la pestaña; no se guarda en cookies, almacenamiento local, archivos ni descargas. El filtro local reduce previamente las capturas que se envían.
 
 Además, el usuario puede aceptar capturas, descargarlas o compartirlas y abrir ChatGPT, Gemini o Claude para realizar una revisión manual con su cuenta habitual.
 
@@ -26,6 +26,8 @@ window.YOTO_VIDEO_CONFIG = {
   detectorEndpoint: "/api/video/detect-frame",
   yotoUploadEndpoint: "/api/video/import-frame",
   geminiModel: "gemini-2.5-flash",
+  openaiModel: "gpt-5.6-terra",
+  claudeModel: "claude-sonnet-5",
   maxFileSizeMB: 300,
   maxDurationSeconds: 900,
   maxFrames: 240,
@@ -75,7 +77,7 @@ Tras seleccionar y descargar los fotogramas, la interfaz permite copiar una inst
 
 En navegadores compatibles, la Web Share API permite compartir directamente hasta 20 capturas aceptadas con una aplicación instalada o servicio ofrecido por el sistema. Como los destinos dependen del dispositivo y del navegador, esta función es complementaria y no sustituye a la descarga ZIP.
 
-La demostración permite una clave propia de Gemini exclusivamente en memoria para facilitar la prueba. No debe incorporarse una clave institucional en `config.js` ni en el repositorio. Si YOTO requiere automatización estable, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
+La demostración permite una clave propia de Gemini, OpenAI o Claude exclusivamente en memoria para facilitar la prueba. No debe incorporarse una clave institucional en `config.js` ni en el repositorio. Si YOTO requiere automatización estable, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
 
 ## 5. Integración con el etiquetado existente
 
@@ -96,8 +98,8 @@ Cada imagen debería crearse como un registro pendiente de identificación y vin
 ## 6. Privacidad y límites
 
 - El prototipo no almacena vídeos ni imágenes.
-- La clave Gemini introducida por el usuario no se persiste y se elimina al cerrar o recargar la pestaña.
-- En modo Gemini, únicamente se envían al proveedor las capturas candidatas; deben revisarse sus condiciones de privacidad y uso.
+- La clave API introducida por el usuario no se persiste y se elimina al cerrar o recargar la pestaña.
+- En modo automático, únicamente se envían al proveedor elegido las capturas candidatas; deben revisarse sus condiciones de privacidad y uso.
 - En la integración, puede conservarse únicamente cada fotograma aceptado.
 - Si YOTO recibe vídeos completos, se recomienda borrarlos automáticamente tras el procesamiento.
 - Los límites se encuentran en `config.js` y también deben validarse en el servidor.
