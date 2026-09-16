@@ -13,6 +13,7 @@ En `dist/config.js`, asignar la URL del servicio:
 ```js
 window.YOTO_VIDEO_CONFIG = {
   detectorEndpoint: "/api/video/detect-frame",
+  yotoUploadEndpoint: "/api/video/import-frame",
   maxFileSizeMB: 300,
   maxDurationSeconds: 900,
   maxFrames: 240,
@@ -56,9 +57,15 @@ El endpoint puede implementarse como un servicio Python separado del núcleo de 
 
 Separarlo permite actualizar el modelo sin modificar la aplicación principal. Para vídeos cortos puede funcionar con CPU y una cola sencilla. Si aumenta el volumen, conviene agrupar varios fotogramas en una petición.
 
+### Alternativa gratuita en el ordenador del usuario
+
+El modo **Mi IA local · Ollama** llama directamente a `POST http://localhost:11434/api/generate`, enviando cada JPEG como imagen base64 y solicitando JSON estructurado. El botón de comprobación consulta `GET /api/tags`. El usuario puede escoger cualquier modelo visual instalado; el valor inicial es `gemma3:4b`.
+
+Como la página se publica en otro origen, Ollama debe autorizar `https://procesadordelta.github.io` mediante `OLLAMA_ORIGINS`. Este modo no reutiliza una sesión de ChatGPT ni accede a cuentas: ejecuta un modelo local, sin claves y sin coste por llamada. Las propuestas siguen requiriendo validación humana.
+
 ## 4. Integración con el etiquetado existente
 
-En producción, el botón de descarga puede sustituirse o acompañarse por **Enviar a etiquetado**. El frontend enviaría solo los fotogramas aceptados y estos datos:
+En producción, al configurar `yotoUploadEndpoint`, aparece **Enviar capturas a YOTO**. El frontend envía solo los fotogramas aceptados como `multipart/form-data`, con los campos `image`, `source_video_name`, `timestamp_seconds`, `quality_score` y `detections`.
 
 ```json
 {
@@ -70,7 +77,7 @@ En producción, el botón de descarga puede sustituirse o acompañarse por **Env
 }
 ```
 
-Cada imagen debería crearse como un registro pendiente de identificación. Se recomienda mantener la validación humana incluso cuando el detector devuelva una categoría.
+Cada imagen debería crearse como un registro pendiente de identificación y vincularse al usuario autenticado. La versión de demostración deja el endpoint vacío hasta que el equipo de YOTO indique la ruta y su contrato. Se recomienda mantener la validación humana incluso cuando el detector devuelva una categoría.
 
 ## 5. Privacidad y límites
 
