@@ -8,6 +8,7 @@ Prototipo web independiente para extraer y revisar fotogramas de vídeos submari
 - Límite configurable de 300 MB y 15 minutos.
 - Extracción de fotogramas en el propio navegador.
 - Filtro de luminosidad, nitidez y duplicados visuales.
+- Filtro experimental sin IA que prioriza movimiento localizado y formas nítidas como indicio de posible fauna.
 - Vista completa de todas las capturas obtenidas con el intervalo elegido.
 - Selección inteligente de capturas destacadas mediante calidad y cambio visual.
 - Priorización de peces y otros organismos cuando se configura un detector marino.
@@ -31,6 +32,10 @@ También puede publicarse tal cual en GitHub Pages: no requiere compilación ni 
 La opción más sencilla no requiere instalación ni clave API: el usuario acepta las mejores capturas, descarga y descomprime el ZIP, copia la instrucción preparada y abre directamente ChatGPT, Gemini o Claude desde la propia página. Después adjunta los JPG y pega la instrucción.
 
 La web no accede a la cuenta del usuario ni comparte credenciales. Cada aplicación aplica sus propios límites y condiciones de privacidad. La identificación de un modelo generalista es orientativa y siempre debe validarse por una persona.
+
+Cuando el navegador lo permite, **Compartir capturas con una aplicación** abre el menú nativo de macOS, Windows o móvil con las imágenes aceptadas y la instrucción. Los destinos disponibles dependen del dispositivo; si la IA utilizada no aparece, se mantiene la descarga ZIP y los accesos directos.
+
+El filtro sin IA no identifica especies: compara zonas del fotograma para favorecer cambios localizados frente a movimientos que afectan a toda la imagen. Puede confundir peces con algas, partículas, reflejos o movimiento de cámara, y puede omitir organismos inmóviles.
 
 ## Conectar una IA marina
 
