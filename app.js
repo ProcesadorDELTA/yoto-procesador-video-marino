@@ -11,7 +11,7 @@
     quality: $("qualitySelect"), progress: $("progressPanel"), progressTitle: $("progressTitle"), progressValue: $("progressValue"),
     progressBar: $("progressBar"), progressDetail: $("progressDetail"), cancel: $("cancelButton"), results: $("resultsPanel"),
     gallery: $("gallery"), empty: $("emptyResults"), kept: $("keptCount"), candidates: $("candidateCount"), rejected: $("rejectedCount"),
-    selected: $("selectedCount"), download: $("downloadButton"), sendToYoto: $("sendToYotoButton"), shareWithApp: $("shareWithApp"), acceptCandidates: $("acceptCandidates"), newVideo: $("newVideoButton"),
+    selected: $("selectedCount"), download: $("downloadButton"), sendToYoto: $("sendToYotoButton"), shareWithApp: $("shareWithApp"), acceptCandidates: $("acceptCandidates"), backToSettings: $("backToSettingsButton"), newVideo: $("newVideoButton"),
     video: $("video"), capture: $("captureCanvas"), analysis: $("analysisCanvas"), detectorStatus: $("detectorStatus"), detectorHelp: $("detectorHelp")
   };
 
@@ -78,6 +78,16 @@
     document.querySelectorAll(".filter").forEach((button) => button.classList.toggle("active", button.dataset.filter === "all"));
     resetHint();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function returnToSettings() {
+    cancelled = true;
+    els.progress.hidden = true;
+    els.results.hidden = true;
+    els.filePanel.hidden = false;
+    els.settings.hidden = false;
+    els.settings.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => els.intelligenceMode.focus({ preventScroll: true }), 350);
   }
 
   async function loadFile(file) {
@@ -623,6 +633,7 @@
   ["dragleave", "drop"].forEach((name) => els.drop.addEventListener(name, (event) => { event.preventDefault(); els.drop.classList.remove("dragover"); }));
   els.drop.addEventListener("drop", (event) => { if (event.dataTransfer.files[0]) loadFile(event.dataTransfer.files[0]); });
   els.remove.addEventListener("click", resetAll);
+  els.backToSettings.addEventListener("click", returnToSettings);
   els.newVideo.addEventListener("click", resetAll);
   els.process.addEventListener("click", processVideo);
   els.interval.addEventListener("change", () => { els.customIntervalLabel.hidden = els.interval.value !== "custom"; });
