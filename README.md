@@ -11,7 +11,7 @@ Prototipo web independiente para extraer y revisar fotogramas de vídeos submari
 - Vista completa de todas las capturas obtenidas con el intervalo elegido.
 - Selección inteligente de capturas destacadas mediante calidad y cambio visual.
 - Priorización de peces y otros organismos cuando se configura un detector marino.
-- Tres modos: selección visual privada, IA local del usuario mediante Ollama e IA marina mediante un endpoint seguro.
+- Selección visual privada, revisión sencilla con ChatGPT, Gemini o Claude e IA marina mediante un endpoint seguro.
 - Intervalos predefinidos o personalizados entre 0,1 y 60 segundos.
 - Revisión manual: aceptar o descartar.
 - Exportación ZIP con imágenes, CSV y, opcionalmente, el frame anterior y posterior a cada selección.
@@ -26,22 +26,17 @@ Puedes abrir `index.html` directamente en Chrome, Edge o Firefox. Si el navegado
 
 También puede publicarse tal cual en GitHub Pages: no requiere compilación ni dependencias. El vídeo se procesa en el portátil; solo se envían fotogramas si se configura expresamente `detectorEndpoint`.
 
-## Usar la IA instalada en el ordenador
+## Revisar capturas con la IA habitual
 
-Selecciona **Mi IA local · Ollama**. La interfaz usa la API local de Ollama en `http://localhost:11434`, comprueba los modelos instalados y envía únicamente las capturas válidas al modelo visual elegido. No requiere clave ni servicio de pago.
+La opción más sencilla no requiere instalación ni clave API: el usuario acepta las mejores capturas, descarga y descomprime el ZIP, copia la instrucción preparada y abre directamente ChatGPT, Gemini o Claude desde la propia página. Después adjunta los JPG y pega la instrucción.
 
-1. Instala Ollama en macOS o Windows.
-2. Ejecuta `ollama pull gemma3:4b`.
-3. Añade `https://procesadordelta.github.io` a `OLLAMA_ORIGINS` y reinicia Ollama para permitir la conexión desde GitHub Pages.
-4. Pulsa **Comprobar conexión** antes de procesar.
-
-La identificación de un modelo generalista es orientativa y siempre debe validarse por una persona. El modo manual **Usar otra IA sin conectar cuentas** sigue disponible para usuarios que prefieran adjuntar el ZIP en su aplicación habitual.
+La web no accede a la cuenta del usuario ni comparte credenciales. Cada aplicación aplica sus propios límites y condiciones de privacidad. La identificación de un modelo generalista es orientativa y siempre debe validarse por una persona.
 
 ## Conectar una IA marina
 
 En la interfaz, selecciona **IA marina · mediante servicio seguro** e introduce la URL HTTPS del servicio. La aplicación envía cada fotograma válido como `multipart/form-data` y espera la respuesta descrita en `INTEGRACION_YOTO.md`.
 
-No introduzcas claves de OpenAI, Hugging Face u otros proveedores en el navegador ni en `config.js`. La clave debe permanecer como secreto en un servicio backend. Esta web no puede conectarse directamente a la sesión de Codex o ChatGPT.
+No introduzcas claves de OpenAI, Google, Anthropic u otros proveedores en el navegador ni en `config.js`. Una integración automática por API debe guardar la clave como secreto en un servicio backend. La versión estática abre las aplicaciones oficiales sin acceder a la sesión del usuario.
 
 ## Enviar capturas a YOTO
 
