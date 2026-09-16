@@ -402,6 +402,7 @@
       }
     }
     packageFiles.push({ name: "resultados.csv", data: new TextEncoder().encode(rows.join("\n")) });
+    packageFiles.push({ name: "INSTRUCCION_PARA_TU_IA.txt", data: new TextEncoder().encode($("myAiPrompt").value) });
     packageFiles.push({ name: "LEEME.txt", data: new TextEncoder().encode(`Fotogramas extraídos con el procesador de vídeo de YOTO.\nEl campo captura_destacada identifica la selección sugerida por el procesador y requiere revisión humana.\nLos frames de contexto se calculan a ±1/${Number(config.assumedFramesPerSecond) || 30} s del fotograma aceptado.\n`) });
     const zip = await createZip(packageFiles);
     const url = URL.createObjectURL(zip);
@@ -417,6 +418,16 @@
   }
 
   els.choose.addEventListener("click", (event) => { event.stopPropagation(); els.input.click(); });
+  $("copyAiPrompt").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("myAiPrompt").value);
+      $("copyAiStatus").textContent = "Instrucción copiada. Adjunta también las imágenes en tu IA.";
+    } catch (_) {
+      $("myAiPrompt").focus();
+      $("myAiPrompt").select();
+      $("copyAiStatus").textContent = "Selecciona y copia el texto manualmente.";
+    }
+  });
   els.drop.addEventListener("click", () => els.input.click());
   els.drop.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); els.input.click(); } });
   els.input.addEventListener("change", () => { if (els.input.files[0]) loadFile(els.input.files[0]); });
