@@ -6,12 +6,12 @@
   const els = {
     input: $("videoInput"), choose: $("chooseButton"), drop: $("dropzone"), filePanel: $("filePanel"), settings: $("settingsPanel"),
     fileName: $("fileName"), fileMeta: $("fileMeta"), remove: $("removeFile"), process: $("processButton"), interval: $("intervalSelect"),
-    customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), includeNeighbors: $("includeNeighbors"),
+    customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), includeNeighbors: $("includeNeighbors"), prioritizeLife: $("prioritizeLife"),
     intelligenceMode: $("intelligenceMode"), detectorEndpointInput: $("detectorEndpointInput"), detectorEndpointLabel: $("detectorEndpointLabel"), aiPrivacyNote: $("aiPrivacyNote"),
     quality: $("qualitySelect"), progress: $("progressPanel"), progressTitle: $("progressTitle"), progressValue: $("progressValue"),
     progressBar: $("progressBar"), progressDetail: $("progressDetail"), cancel: $("cancelButton"), results: $("resultsPanel"),
     gallery: $("gallery"), empty: $("emptyResults"), kept: $("keptCount"), candidates: $("candidateCount"), rejected: $("rejectedCount"),
-    selected: $("selectedCount"), download: $("downloadButton"), sendToYoto: $("sendToYotoButton"), acceptCandidates: $("acceptCandidates"), newVideo: $("newVideoButton"),
+    selected: $("selectedCount"), download: $("downloadButton"), sendToYoto: $("sendToYotoButton"), shareWithApp: $("shareWithApp"), acceptCandidates: $("acceptCandidates"), newVideo: $("newVideoButton"),
     video: $("video"), capture: $("captureCanvas"), analysis: $("analysisCanvas"), detectorStatus: $("detectorStatus"), detectorHelp: $("detectorHelp")
   };
 
@@ -133,21 +133,35 @@
     }
     const samples = Math.floor((width - 2) * (height - 2) / 4);
     const sharpness = edge / Math.max(1, samples);
-    let difference = 1;
+    let difference = 0;
+    let localizedMotion = 0;
     if (previousGray) {
       let changed = 0;
       let total = 0;
+      const gridSums = new Float32Array(16);
+      const gridCounts = new Uint16Array(16);
       for (let i = 0; i < gray.length; i += 3) {
         const delta = Math.abs(gray[i] - previousGray[i]);
         total += delta;
         if (delta > 22) changed++;
+        const x = i % width;
+        const y = Math.floor(i / width);
+        const cell = Math.min(3, Math.floor(y * 4 / height)) * 4 + Math.min(3, Math.floor(x * 4 / width));
+        gridSums[cell] += delta;
+        gridCounts[cell]++;
       }
       difference = Math.min(1, (total / Math.ceil(gray.length / 3)) / 70);
       difference = Math.max(difference, changed / Math.ceil(gray.length / 3));
+      const cellMotion = Array.from(gridSums, (sum, index) => sum / Math.max(1, gridCounts[index]));
+      const activeCells = cellMotion.filter((value) => value > 17).length;
+      const peakMotion = Math.max(...cellMotion);
+      const concentration = activeCells > 0 && activeCells <= 9 ? 1 - activeCells / 12 : 0;
+      localizedMotion = Math.min(1, peakMotion / 42) * Math.max(0, concentration);
     }
     const lightScore = luminance < 18 ? 0 : luminance > 245 ? 0 : Math.min(1, luminance / 75, (255 - luminance) / 45);
     const sharpScore = Math.min(1, sharpness / 38);
-    return { gray, luminance, sharpness, difference, quality: Math.round((lightScore * .42 + sharpScore * .58) * 100) };
+    const lifeScore = Math.round((localizedMotion * .76 + sharpScore * .24) * 100);
+    return { gray, luminance, sharpness, difference, localizedMotion, lifeScore, quality: Math.round((lightScore * .42 + sharpScore * .58) * 100) };
   }
 
   async function detectWithEndpoint(blob, time) {
@@ -239,12 +253,16 @@
         const marineDetections = (detections || []).filter(isMarineDetection).sort((a, b) => detectionConfidence(b) - detectionConfidence(a));
         const detected = marineDetections.length > 0;
         const visualCandidate = analysis.difference > .16 && analysis.quality >= qualityThreshold + 4;
+        const lifeCandidate = analysis.lifeScore >= 44 && analysis.difference > .035 && analysis.quality >= qualityThreshold;
+        const locallyRecommended = els.prioritizeLife.checked ? lifeCandidate : visualCandidate;
         frames.push({
           id: `frame-${i}`,
           time,
           quality: analysis.quality,
           change: Math.round(analysis.difference * 100),
-          recommended: !excluded && (detected || visualCandidate),
+          lifeScore: analysis.lifeScore,
+          lifeCandidate,
+          recommended: !excluded && (detected || locallyRecommended),
           excluded,
           exclusionReason: belowQuality ? "Baja calidad" : duplicate ? "Muy similar" : "",
           detectorUsed: detections !== null,
@@ -277,7 +295,7 @@
     const confidence = topDetection ? detectionConfidence(topDetection) : 0;
     const detectorLabel = detectionName ? `${escapeHtml(detectionName)}${confidence ? ` ${Math.round(confidence * 100)}%` : ""}` : "Posible organismo";
     const badge = frame.recommended
-      ? `<span class="candidate-badge">${frame.detections.length ? detectorLabel : "Captura destacada"}</span>`
+      ? `<span class="candidate-badge">${frame.detections.length ? detectorLabel : frame.lifeCandidate ? `Posible vida · ${frame.lifeScore}/100` : "Captura destacada"}</span>`
       : frame.excluded ? `<span class="quality-badge">${frame.exclusionReason}</span>` : "";
     article.innerHTML = `
       <div class="frame-image"><img src="${frame.url}" alt="Fotograma del vídeo en ${formatTime(frame.time)}">${badge}<span class="timestamp">${formatTime(frame.time)}</span></div>
@@ -318,6 +336,7 @@
     els.rejected.textContent = rejectedCount;
     els.selected.textContent = `${accepted} ${accepted === 1 ? "fotograma aceptado" : "fotogramas aceptados"}`;
     els.download.disabled = accepted === 0;
+    els.shareWithApp.disabled = accepted === 0 || typeof navigator.share !== "function";
   }
 
   const crcTable = (() => {
@@ -441,6 +460,30 @@
     }
   }
 
+  async function shareSelectionWithApp() {
+    const accepted = frames.filter((frame) => frame.status === "accepted").slice(0, 20);
+    if (!accepted.length) return;
+    const base = (sourceFile.name.replace(/\.[^.]+$/, "") || "video").replace(/[^a-z0-9_-]+/gi, "_");
+    const files = accepted.map((frame, index) => new File(
+      [frame.blob],
+      `${base}_${String(index + 1).padStart(3, "0")}_${formatTime(frame.time).replace(/[:.]/g, "-")}.jpg`,
+      { type: "image/jpeg" }
+    ));
+    const shareData = { title: "Capturas submarinas YOTO", text: $("myAiPrompt").value, files };
+    if (typeof navigator.share !== "function" || (navigator.canShare && !navigator.canShare({ files }))) {
+      $("copyAiStatus").textContent = "Este navegador no permite compartir archivos. Descarga el ZIP y usa los accesos directos.";
+      return;
+    }
+    try {
+      await navigator.share(shareData);
+      $("copyAiStatus").textContent = accepted.length === frames.filter((frame) => frame.status === "accepted").length
+        ? "Capturas compartidas con la aplicación elegida."
+        : "Se compartieron las primeras 20 capturas; usa el ZIP para enviar el resto.";
+    } catch (error) {
+      if (error.name !== "AbortError") $("copyAiStatus").textContent = "No se pudieron compartir. Descarga el ZIP y abre la IA con los botones inferiores.";
+    }
+  }
+
   els.choose.addEventListener("click", (event) => { event.stopPropagation(); els.input.click(); });
   $("copyAiPrompt").addEventListener("click", async () => {
     try {
@@ -452,6 +495,7 @@
       $("copyAiStatus").textContent = "Selecciona y copia el texto manualmente.";
     }
   });
+  els.shareWithApp.addEventListener("click", shareSelectionWithApp);
   els.drop.addEventListener("click", () => els.input.click());
   els.drop.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); els.input.click(); } });
   els.input.addEventListener("change", () => { if (els.input.files[0]) loadFile(els.input.files[0]); });
@@ -491,6 +535,11 @@
     els.detectorHelp.textContent = "Prioriza fotogramas con peces y otros organismos marinos detectados por el modelo configurado.";
   }
   if (config.yotoUploadEndpoint) els.sendToYoto.hidden = false;
+  if (typeof navigator.share !== "function") {
+    els.shareWithApp.disabled = true;
+    els.shareWithApp.textContent = "Compartir no disponible en este navegador";
+    els.shareWithApp.title = "Usa Descargar selección y los accesos directos a tu IA.";
+  }
 
   if (document.modelContext?.registerTool) {
     document.modelContext.registerTool({
