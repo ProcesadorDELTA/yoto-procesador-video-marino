@@ -11,13 +11,15 @@ Prototipo web independiente para extraer y revisar fotogramas de vídeos submari
 - Filtro experimental sin IA que prioriza movimiento localizado y formas nítidas como indicio de posible fauna.
 - Vista completa de todas las capturas obtenidas con el intervalo elegido.
 - Selección inteligente de capturas destacadas mediante calidad y cambio visual.
-- Priorización de peces y otros organismos mediante filtro local, Gemini con clave propia o un detector institucional configurado por YOTO.
+- Priorización de peces y otros organismos mediante filtro local, Gemini, OpenAI o Claude con clave propia, o un detector institucional configurado por YOTO.
 - Selección visual privada y revisión sencilla con ChatGPT, Gemini o Claude.
 - Intervalos predefinidos o personalizados entre 0,1 y 60 segundos.
 - Revisión manual: aceptar o descartar.
 - Exportación ZIP con imágenes, CSV y, opcionalmente, el frame anterior y posterior a cada selección.
 - Adaptación para móvil y escritorio.
-- Campo sencillo para pegar una clave API de Gemini, que solo permanece en la memoria de la pestaña.
+- Selector sencillo para pegar una clave API propia de Gemini, OpenAI o Claude, que solo permanece en la memoria de la pestaña.
+- Mensajes explicativos al pasar el cursor o enfocar los indicadores de calidad y cambio visual.
+- Elección independiente de 0 a 10 frames anteriores y posteriores por cada captura aceptada.
 - Punto de conexión configurable para un futuro detector institucional y para enviar las capturas aceptadas a YOTO.
 
 El prototipo no sube el vídeo a ningún servidor. Esto permite probar la experiencia sin costes de almacenamiento. Para usar FathomNet en producción se debe conectar el endpoint descrito en `INTEGRACION_YOTO.md`.
@@ -38,11 +40,11 @@ Cuando el navegador lo permite, **Compartir capturas con una aplicación** abre 
 
 El filtro sin IA no identifica especies: compara zonas del fotograma para favorecer cambios localizados frente a movimientos que afectan a toda la imagen. Puede confundir peces con algas, partículas, reflejos o movimiento de cámara, y puede omitir organismos inmóviles.
 
-## Análisis automático con Gemini
+## Análisis automático con Gemini, OpenAI o Claude
 
-En la interfaz, selecciona **Analizar con Gemini · clave propia**, pega una clave obtenida en Google AI Studio y procesa el vídeo. Primero se aplica el filtro local; solo las capturas candidatas se envían a Gemini. La clave no se guarda en `localStorage`, cookies, descargas ni archivos del proyecto y desaparece al cerrar o recargar la pestaña.
+En la interfaz, selecciona el proveedor, pega una clave API propia y procesa el vídeo. Primero se aplica el filtro local; solo las capturas candidatas se envían al proveedor elegido. La clave no se guarda en `localStorage`, cookies, descargas ni archivos del proyecto y desaparece al cerrar o recargar la pestaña.
 
-Esta conexión directa está pensada para una prueba voluntaria con una clave del propio usuario. Puede estar sujeta a límites o costes del proveedor. En producción, YOTO debería guardar cualquier credencial institucional como secreto en su backend. La versión estática también abre las aplicaciones oficiales sin acceder a la sesión del usuario.
+Esta conexión directa está pensada para una prueba voluntaria con una clave del propio usuario. Una suscripción a ChatGPT, Gemini o Claude no implica necesariamente disponer de acceso API. El uso puede estar sujeto a límites o costes del proveedor. En producción, YOTO debería guardar cualquier credencial institucional como secreto en su backend. La versión estática también abre las aplicaciones oficiales sin acceder a la sesión del usuario.
 
 El campo técnico **URL del servicio de IA** se ha eliminado de la interfaz. Si el equipo de desarrollo configura `detectorEndpoint` en `config.js`, aparecerá automáticamente la opción **Detector marino de YOTO** sin pedir al usuario direcciones ni credenciales técnicas.
 
