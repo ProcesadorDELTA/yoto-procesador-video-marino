@@ -90,6 +90,11 @@
               <option value="ai">IA marina · mediante servicio seguro</option>
             </select>
           </label>
+          <label class="life-filter-option">
+            <span>Prioridad de selección</span>
+            <span class="check-control"><input id="prioritizeLife" type="checkbox" checked> Buscar movimiento localizado y formas destacadas</span>
+            <small>Experimental y sin IA: ayuda a encontrar posible fauna, pero también puede marcar algas, partículas o movimiento de cámara.</small>
+          </label>
           <label id="detectorEndpointLabel" hidden>
             <span>URL del servicio de IA</span>
             <input id="detectorEndpointInput" type="url" placeholder="https://tu-servidor.es/api/detectar">
@@ -143,7 +148,7 @@
         <p class="ai-intro">No necesitas instalar programas ni pegar una clave API. Sigue estos tres pasos:</p>
         <ol class="ai-steps"><li>Acepta las mejores capturas y pulsa <strong>Descargar selección</strong>.</li><li>Descomprime el ZIP y copia la instrucción preparada.</li><li>Abre ChatGPT, Gemini o Claude y adjunta las imágenes JPG.</li></ol>
         <textarea id="myAiPrompt" rows="6" readonly aria-label="Instrucción para identificar organismos marinos">Analiza estas capturas de vídeo submarino para localizar organismos marinos. Para cada archivo, indica: organismos visibles, posible especie o grupo taxonómico, rasgos que apoyan la identificación, nivel de confianza (alto, medio o bajo) y si la imagen es adecuada para validación en YOTO. No inventes especies: si no hay evidencia suficiente, usa un grupo amplio como pez, crustáceo, molusco, alga o coral. Si varias capturas parecen mostrar el mismo ejemplar, indícalo. Devuelve una tabla y señala qué archivos conviene subir a YOTO. Toda identificación requiere revisión humana.</textarea>
-        <div class="ai-toolbar"><button id="copyAiPrompt" class="button secondary" type="button">1. Copiar instrucción</button><span id="copyAiStatus" role="status"></span></div>
+        <div class="ai-toolbar"><button id="copyAiPrompt" class="button secondary" type="button">1. Copiar instrucción</button><button id="shareWithApp" class="button yoto-send" type="button" disabled>2. Compartir capturas con una aplicación</button><span id="copyAiStatus" role="status"></span></div>
         <div class="ai-apps" aria-label="Abrir aplicaciones de inteligencia artificial">
           <a class="ai-app chatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener"><strong>ChatGPT</strong><span>Abrir nuevo chat</span></a>
           <a class="ai-app gemini" href="https://gemini.google.com/app" target="_blank" rel="noopener"><strong>Gemini</strong><span>Abrir Gemini</span></a>
