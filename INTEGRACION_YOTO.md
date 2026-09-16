@@ -57,11 +57,11 @@ El endpoint puede implementarse como un servicio Python separado del núcleo de 
 
 Separarlo permite actualizar el modelo sin modificar la aplicación principal. Para vídeos cortos puede funcionar con CPU y una cola sencilla. Si aumenta el volumen, conviene agrupar varios fotogramas en una petición.
 
-### Alternativa gratuita en el ordenador del usuario
+### Alternativa sencilla con la IA del usuario
 
-El modo **Mi IA local · Ollama** llama directamente a `POST http://localhost:11434/api/generate`, enviando cada JPEG como imagen base64 y solicitando JSON estructurado. El botón de comprobación consulta `GET /api/tags`. El usuario puede escoger cualquier modelo visual instalado; el valor inicial es `gemma3:4b`.
+Tras seleccionar y descargar los fotogramas, la interfaz permite copiar una instrucción especializada y abrir directamente ChatGPT, Gemini o Claude. El usuario descomprime el ZIP, adjunta los JPG y pega la instrucción. Este flujo evita instalaciones, problemas de conexión local y exposición de claves API.
 
-Como la página se publica en otro origen, Ollama debe autorizar `https://procesadordelta.github.io` mediante `OLLAMA_ORIGINS`. Este modo no reutiliza una sesión de ChatGPT ni accede a cuentas: ejecuta un modelo local, sin claves y sin coste por llamada. Las propuestas siguen requiriendo validación humana.
+Una página estática no debe pedir ni conservar claves de OpenAI, Google o Anthropic. Si YOTO requiere automatización completa, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
 
 ## 4. Integración con el etiquetado existente
 
