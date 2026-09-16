@@ -6,6 +6,8 @@ La versión entregada funciona enteramente en el navegador. Lee el vídeo selecc
 
 La marca **Captura destacada** procede de una comparación de calidad y cambios entre fotogramas. No equivale a una identificación biológica y siempre requiere revisión humana.
 
+La opción **Buscar movimiento localizado y formas destacadas** divide la imagen de análisis en una cuadrícula y favorece cambios concentrados en pocas zonas, combinados con nitidez suficiente. Es un filtro clásico de imagen, no un reconocimiento de especies. El movimiento de cámara, las algas y las partículas pueden producir falsos positivos, mientras que los organismos inmóviles pueden pasar inadvertidos.
+
 ## 2. Conectar el detector marino
 
 En `dist/config.js`, asignar la URL del servicio:
@@ -60,6 +62,8 @@ Separarlo permite actualizar el modelo sin modificar la aplicación principal. P
 ### Alternativa sencilla con la IA del usuario
 
 Tras seleccionar y descargar los fotogramas, la interfaz permite copiar una instrucción especializada y abrir directamente ChatGPT, Gemini o Claude. El usuario descomprime el ZIP, adjunta los JPG y pega la instrucción. Este flujo evita instalaciones, problemas de conexión local y exposición de claves API.
+
+En navegadores compatibles, la Web Share API permite compartir directamente hasta 20 capturas aceptadas con una aplicación instalada o servicio ofrecido por el sistema. Como los destinos dependen del dispositivo y del navegador, esta función es complementaria y no sustituye a la descarga ZIP.
 
 Una página estática no debe pedir ni conservar claves de OpenAI, Google o Anthropic. Si YOTO requiere automatización completa, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
 
