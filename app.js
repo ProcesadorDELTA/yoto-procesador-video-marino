@@ -1,13 +1,13 @@
 (() => {
   "use strict";
 
-  const config = Object.assign({ detectorEndpoint: "", yotoUploadEndpoint: "", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
+  const config = Object.assign({ detectorEndpoint: "", yotoUploadEndpoint: "", geminiModel: "gemini-2.5-flash", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
   const $ = (id) => document.getElementById(id);
   const els = {
     input: $("videoInput"), choose: $("chooseButton"), drop: $("dropzone"), filePanel: $("filePanel"), settings: $("settingsPanel"),
     fileName: $("fileName"), fileMeta: $("fileMeta"), remove: $("removeFile"), process: $("processButton"), interval: $("intervalSelect"),
     customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), includeNeighbors: $("includeNeighbors"), prioritizeLife: $("prioritizeLife"),
-    intelligenceMode: $("intelligenceMode"), detectorEndpointInput: $("detectorEndpointInput"), detectorEndpointLabel: $("detectorEndpointLabel"), aiPrivacyNote: $("aiPrivacyNote"),
+    intelligenceMode: $("intelligenceMode"), geminiApiKey: $("geminiApiKey"), geminiKeyLabel: $("geminiKeyLabel"), toggleGeminiKey: $("toggleGeminiKey"), aiPrivacyNote: $("aiPrivacyNote"),
     quality: $("qualitySelect"), progress: $("progressPanel"), progressTitle: $("progressTitle"), progressValue: $("progressValue"),
     progressBar: $("progressBar"), progressDetail: $("progressDetail"), cancel: $("cancelButton"), results: $("resultsPanel"),
     gallery: $("gallery"), empty: $("emptyResults"), kept: $("keptCount"), candidates: $("candidateCount"), rejected: $("rejectedCount"),
@@ -24,7 +24,8 @@
 
   const MARINE_LABELS = ["fish", "shark", "ray", "stingray", "eel", "turtle", "octopus", "squid", "crab", "lobster", "shrimp", "prawn", "jellyfish", "coral", "seahorse", "seal", "dolphin", "whale", "starfish", "sea star", "urchin", "mollusc", "mollusk", "organism", "pez", "tiburon", "tiburón", "raya", "anguila", "tortuga", "pulpo", "calamar", "cangrejo", "langosta", "gamba", "medusa", "coral", "caballito", "foca", "delfin", "delfín", "ballena", "estrella", "erizo", "molusco", "organismo"];
   const isMarineDetection = (item) => {
-    const label = String(item.label || item.class || item.name || "").toLowerCase();
+    if (item.source === "gemini") return true;
+    const label = String([item.label, item.class, item.name, item.group, item.scientific_name].filter(Boolean).join(" ")).toLowerCase();
     return MARINE_LABELS.some((term) => label.includes(term));
   };
   const detectionConfidence = (item) => {
@@ -165,8 +166,7 @@
   }
 
   async function detectWithEndpoint(blob, time) {
-    if (els.intelligenceMode.value !== "ai") return null;
-    const endpoint = els.detectorEndpointInput.value.trim();
+    const endpoint = config.detectorEndpoint;
     if (!endpoint) return null;
     const body = new FormData();
     body.append("frame", blob, `frame_${Math.round(time * 1000)}.jpg`);
@@ -179,6 +179,61 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1]);
+      reader.onerror = () => reject(new Error("No se pudo preparar la captura"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function parseGeminiDetections(text) {
+    const cleaned = String(text || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    if (start < 0 || end < start) return [];
+    const result = JSON.parse(cleaned.slice(start, end + 1));
+    if (!Array.isArray(result)) return [];
+    return result.slice(0, 8).map((item) => ({
+      label: String(item.common_name || item.scientific_name || item.group || item.label || "organismo marino"),
+      scientific_name: String(item.scientific_name || ""),
+      group: String(item.group || ""),
+      confidence: Math.max(0, Math.min(1, Number(item.confidence) || 0)),
+      notes: String(item.evidence || item.notes || ""),
+      source: "gemini"
+    }));
+  }
+
+  async function detectWithGemini(blob) {
+    if (els.intelligenceMode.value !== "gemini") return null;
+    const key = els.geminiApiKey.value.trim();
+    if (!key) return null;
+    const image = await blobToBase64(blob);
+    const prompt = "Examina esta captura submarina. Devuelve exclusivamente un array JSON. Incluye solo organismos realmente visibles. Cada elemento debe contener common_name, scientific_name, group, confidence entre 0 y 1, y evidence. No inventes una especie: si no es fiable, usa un grupo amplio como pez, crustáceo, molusco, alga, coral u organismo marino. Si no se observa ninguno, devuelve [].";
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.geminiModel)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: image } }] }],
+        generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+      })
+    });
+    if (!response.ok) {
+      const details = await response.json().catch(() => ({}));
+      throw new Error(details?.error?.message || `Gemini respondió ${response.status}`);
+    }
+    const result = await response.json();
+    const text = result?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "[]";
+    return parseGeminiDetections(text);
+  }
+
+  async function detectOrganisms(blob, time) {
+    if (els.intelligenceMode.value === "gemini") return detectWithGemini(blob);
+    if (els.intelligenceMode.value === "service" && config.detectorEndpoint) return detectWithEndpoint(blob, time);
+    return null;
   }
 
 
@@ -210,14 +265,14 @@
       return;
     }
     els.customInterval.setCustomValidity("");
-    if (els.intelligenceMode.value === "ai" && !els.detectorEndpointInput.value.trim()) {
+    if (els.intelligenceMode.value === "gemini" && !els.geminiApiKey.value.trim()) {
       els.settings.hidden = false;
       els.progress.hidden = true;
-      els.detectorEndpointInput.setCustomValidity("Introduce la URL segura del servicio de IA.");
-      els.detectorEndpointInput.reportValidity();
+      els.geminiApiKey.setCustomValidity("Pega una clave API de Gemini o selecciona la opción local.");
+      els.geminiApiKey.reportValidity();
       return;
     }
-    els.detectorEndpointInput.setCustomValidity("");
+    els.geminiApiKey.setCustomValidity("");
     const thresholds = { low: 28, medium: 40, high: 55 };
     const qualityThreshold = thresholds[els.quality.value];
     const duration = els.video.duration;
@@ -249,12 +304,16 @@
         if (excluded) rejectedCount++;
         const blob = await canvasBlob(els.capture);
         if (!blob) continue;
-        const detections = excluded ? null : await detectWithEndpoint(blob, time);
-        const marineDetections = (detections || []).filter(isMarineDetection).sort((a, b) => detectionConfidence(b) - detectionConfidence(a));
-        const detected = marineDetections.length > 0;
         const visualCandidate = analysis.difference > .16 && analysis.quality >= qualityThreshold + 4;
         const lifeCandidate = analysis.lifeScore >= 44 && analysis.difference > .035 && analysis.quality >= qualityThreshold;
         const locallyRecommended = els.prioritizeLife.checked ? lifeCandidate : visualCandidate;
+        let detections = null;
+        if (!excluded && (locallyRecommended || !els.prioritizeLife.checked)) {
+          updateProgress(i, total, `Analizando posibles organismos en ${formatTime(time)}.`);
+          detections = await detectOrganisms(blob, time);
+        }
+        const marineDetections = (detections || []).filter(isMarineDetection).sort((a, b) => detectionConfidence(b) - detectionConfidence(a));
+        const detected = marineDetections.length > 0;
         frames.push({
           id: `frame-${i}`,
           time,
@@ -272,7 +331,13 @@
           status: "pending"
         });
         if (!excluded) previousAcceptedGray = analysis.gray;
-      } catch (_) {
+      } catch (error) {
+        if (els.intelligenceMode.value === "gemini") {
+          els.settings.hidden = false;
+          els.progress.hidden = true;
+          els.detectorHelp.textContent = `No se pudo utilizar Gemini: ${error.message}. Revisa la clave, sus límites y la conexión, o selecciona el modo local.`;
+          return;
+        }
         rejectedCount++;
       }
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -507,13 +572,18 @@
   els.process.addEventListener("click", processVideo);
   els.interval.addEventListener("change", () => { els.customIntervalLabel.hidden = els.interval.value !== "custom"; });
   els.intelligenceMode.addEventListener("change", () => {
-    const useAI = els.intelligenceMode.value === "ai";
-    els.detectorEndpointLabel.hidden = !useAI;
+    const useAI = els.intelligenceMode.value === "gemini";
+    els.geminiKeyLabel.hidden = !useAI;
     els.aiPrivacyNote.hidden = !useAI;
-    els.detectorStatus.textContent = useAI ? "IA marina preparada" : "Selección inteligente activada";
+    els.detectorStatus.textContent = useAI ? "Análisis automático con Gemini" : "Selección inteligente activada";
     els.detectorHelp.textContent = useAI
-      ? "Los fotogramas válidos se enviarán al servicio configurado para localizar peces y otros organismos marinos."
+      ? "Primero se aplica el filtro local y después Gemini analiza las capturas candidatas. Las propuestas siempre deben revisarse."
       : "Destaca las capturas más nítidas y con cambios relevantes sin enviar imágenes fuera del dispositivo.";
+  });
+  els.toggleGeminiKey.addEventListener("click", () => {
+    const reveal = els.geminiApiKey.type === "password";
+    els.geminiApiKey.type = reveal ? "text" : "password";
+    els.toggleGeminiKey.textContent = reveal ? "Ocultar" : "Ver";
   });
   els.cancel.addEventListener("click", () => { cancelled = true; });
   els.download.addEventListener("click", downloadSelection);
@@ -527,12 +597,12 @@
   }));
 
   if (config.detectorEndpoint) {
-    els.detectorEndpointInput.value = config.detectorEndpoint;
-    els.intelligenceMode.value = "ai";
-    els.detectorEndpointLabel.hidden = false;
-    els.aiPrivacyNote.hidden = false;
+    const option = document.createElement("option");
+    option.value = "service";
+    option.textContent = "Detector marino de YOTO";
+    els.intelligenceMode.appendChild(option);
     els.detectorStatus.textContent = "Detector marino conectado";
-    els.detectorHelp.textContent = "Prioriza fotogramas con peces y otros organismos marinos detectados por el modelo configurado.";
+    els.detectorHelp.textContent = "El equipo de YOTO ha configurado un detector marino institucional. También puede seleccionarse Gemini con clave propia.";
   }
   if (config.yotoUploadEndpoint) els.sendToYoto.hidden = false;
   if (typeof navigator.share !== "function") {
