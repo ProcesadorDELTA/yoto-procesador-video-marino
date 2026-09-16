@@ -1,13 +1,13 @@
 (() => {
   "use strict";
 
-  const config = Object.assign({ detectorEndpoint: "", yotoUploadEndpoint: "", geminiModel: "gemini-2.5-flash", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
+  const config = Object.assign({ detectorEndpoint: "", yotoUploadEndpoint: "", geminiModel: "gemini-2.5-flash", openaiModel: "gpt-5.6-terra", claudeModel: "claude-sonnet-5", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
   const $ = (id) => document.getElementById(id);
   const els = {
     input: $("videoInput"), choose: $("chooseButton"), drop: $("dropzone"), filePanel: $("filePanel"), settings: $("settingsPanel"),
     fileName: $("fileName"), fileMeta: $("fileMeta"), remove: $("removeFile"), process: $("processButton"), interval: $("intervalSelect"),
-    customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), includeNeighbors: $("includeNeighbors"), prioritizeLife: $("prioritizeLife"),
-    intelligenceMode: $("intelligenceMode"), geminiApiKey: $("geminiApiKey"), geminiKeyLabel: $("geminiKeyLabel"), toggleGeminiKey: $("toggleGeminiKey"), aiPrivacyNote: $("aiPrivacyNote"),
+    customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), previousFramesCount: $("previousFramesCount"), nextFramesCount: $("nextFramesCount"), prioritizeLife: $("prioritizeLife"),
+    intelligenceMode: $("intelligenceMode"), aiApiKey: $("aiApiKey"), apiKeyLabel: $("apiKeyLabel"), apiKeyTitle: $("apiKeyTitle"), apiKeyHelp: $("apiKeyHelp"), getApiKeyLink: $("getApiKeyLink"), toggleAiKey: $("toggleAiKey"), aiPrivacyNote: $("aiPrivacyNote"),
     quality: $("qualitySelect"), progress: $("progressPanel"), progressTitle: $("progressTitle"), progressValue: $("progressValue"),
     progressBar: $("progressBar"), progressDetail: $("progressDetail"), cancel: $("cancelButton"), results: $("resultsPanel"),
     gallery: $("gallery"), empty: $("emptyResults"), kept: $("keptCount"), candidates: $("candidateCount"), rejected: $("rejectedCount"),
@@ -24,7 +24,7 @@
 
   const MARINE_LABELS = ["fish", "shark", "ray", "stingray", "eel", "turtle", "octopus", "squid", "crab", "lobster", "shrimp", "prawn", "jellyfish", "coral", "seahorse", "seal", "dolphin", "whale", "starfish", "sea star", "urchin", "mollusc", "mollusk", "organism", "pez", "tiburon", "tiburón", "raya", "anguila", "tortuga", "pulpo", "calamar", "cangrejo", "langosta", "gamba", "medusa", "coral", "caballito", "foca", "delfin", "delfín", "ballena", "estrella", "erizo", "molusco", "organismo"];
   const isMarineDetection = (item) => {
-    if (item.source === "gemini") return true;
+    if (["gemini", "openai", "claude"].includes(item.source)) return true;
     const label = String([item.label, item.class, item.name, item.group, item.scientific_name].filter(Boolean).join(" ")).toLowerCase();
     return MARINE_LABELS.some((term) => label.includes(term));
   };
@@ -190,7 +190,14 @@
     });
   }
 
-  function parseGeminiDetections(text) {
+  const AI_PROVIDERS = {
+    gemini: { name: "Gemini", keyUrl: "https://aistudio.google.com/app/apikey", keyHelp: "La clave de Google se conserva solo mientras esta pestaña permanece abierta." },
+    openai: { name: "OpenAI", keyUrl: "https://platform.openai.com/api-keys", keyHelp: "La clave de OpenAI se conserva solo mientras esta pestaña permanece abierta." },
+    claude: { name: "Claude", keyUrl: "https://console.anthropic.com/settings/keys", keyHelp: "La clave de Anthropic se conserva solo mientras esta pestaña permanece abierta." }
+  };
+  const ANALYSIS_PROMPT = "Examina esta captura submarina. Devuelve exclusivamente un array JSON. Incluye solo organismos realmente visibles. Cada elemento debe contener common_name, scientific_name, group, confidence entre 0 y 1, y evidence. No inventes una especie: si no es fiable, usa un grupo amplio como pez, crustáceo, molusco, alga, coral u organismo marino. Si no se observa ninguno, devuelve [].";
+
+  function parseApiDetections(text, source) {
     const cleaned = String(text || "").replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
     const start = cleaned.indexOf("[");
     const end = cleaned.lastIndexOf("]");
@@ -203,21 +210,20 @@
       group: String(item.group || ""),
       confidence: Math.max(0, Math.min(1, Number(item.confidence) || 0)),
       notes: String(item.evidence || item.notes || ""),
-      source: "gemini"
+      source
     }));
   }
 
   async function detectWithGemini(blob) {
     if (els.intelligenceMode.value !== "gemini") return null;
-    const key = els.geminiApiKey.value.trim();
+    const key = els.aiApiKey.value.trim();
     if (!key) return null;
     const image = await blobToBase64(blob);
-    const prompt = "Examina esta captura submarina. Devuelve exclusivamente un array JSON. Incluye solo organismos realmente visibles. Cada elemento debe contener common_name, scientific_name, group, confidence entre 0 y 1, y evidence. No inventes una especie: si no es fiable, usa un grupo amplio como pez, crustáceo, molusco, alga, coral u organismo marino. Si no se observa ninguno, devuelve [].";
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.geminiModel)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: image } }] }],
+        contents: [{ parts: [{ text: ANALYSIS_PROMPT }, { inline_data: { mime_type: "image/jpeg", data: image } }] }],
         generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
       })
     });
@@ -227,11 +233,57 @@
     }
     const result = await response.json();
     const text = result?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "[]";
-    return parseGeminiDetections(text);
+    return parseApiDetections(text, "gemini");
+  }
+
+  async function detectWithOpenAI(blob) {
+    const key = els.aiApiKey.value.trim();
+    if (!key) return null;
+    const image = await blobToBase64(blob);
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body: JSON.stringify({
+        model: config.openaiModel,
+        input: [{ role: "user", content: [{ type: "input_text", text: ANALYSIS_PROMPT }, { type: "input_image", image_url: `data:image/jpeg;base64,${image}`, detail: "low" }] }],
+        max_output_tokens: 1000
+      })
+    });
+    if (!response.ok) {
+      const details = await response.json().catch(() => ({}));
+      throw new Error(details?.error?.message || `OpenAI respondió ${response.status}`);
+    }
+    const result = await response.json();
+    const text = result.output_text || result.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("") || "[]";
+    return parseApiDetections(text, "openai");
+  }
+
+  async function detectWithClaude(blob) {
+    const key = els.aiApiKey.value.trim();
+    if (!key) return null;
+    const image = await blobToBase64(blob);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({
+        model: config.claudeModel,
+        max_tokens: 1000,
+        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } }, { type: "text", text: ANALYSIS_PROMPT }] }]
+      })
+    });
+    if (!response.ok) {
+      const details = await response.json().catch(() => ({}));
+      throw new Error(details?.error?.message || `Claude respondió ${response.status}`);
+    }
+    const result = await response.json();
+    const text = result.content?.filter((item) => item.type === "text").map((item) => item.text || "").join("") || "[]";
+    return parseApiDetections(text, "claude");
   }
 
   async function detectOrganisms(blob, time) {
     if (els.intelligenceMode.value === "gemini") return detectWithGemini(blob);
+    if (els.intelligenceMode.value === "openai") return detectWithOpenAI(blob);
+    if (els.intelligenceMode.value === "claude") return detectWithClaude(blob);
     if (els.intelligenceMode.value === "service" && config.detectorEndpoint) return detectWithEndpoint(blob, time);
     return null;
   }
@@ -265,14 +317,15 @@
       return;
     }
     els.customInterval.setCustomValidity("");
-    if (els.intelligenceMode.value === "gemini" && !els.geminiApiKey.value.trim()) {
+    const provider = AI_PROVIDERS[els.intelligenceMode.value];
+    if (provider && !els.aiApiKey.value.trim()) {
       els.settings.hidden = false;
       els.progress.hidden = true;
-      els.geminiApiKey.setCustomValidity("Pega una clave API de Gemini o selecciona la opción local.");
-      els.geminiApiKey.reportValidity();
+      els.aiApiKey.setCustomValidity(`Pega una clave API de ${provider.name} o selecciona la opción local.`);
+      els.aiApiKey.reportValidity();
       return;
     }
-    els.geminiApiKey.setCustomValidity("");
+    els.aiApiKey.setCustomValidity("");
     const thresholds = { low: 28, medium: 40, high: 55 };
     const qualityThreshold = thresholds[els.quality.value];
     const duration = els.video.duration;
@@ -332,10 +385,11 @@
         });
         if (!excluded) previousAcceptedGray = analysis.gray;
       } catch (error) {
-        if (els.intelligenceMode.value === "gemini") {
+        if (AI_PROVIDERS[els.intelligenceMode.value]) {
           els.settings.hidden = false;
           els.progress.hidden = true;
-          els.detectorHelp.textContent = `No se pudo utilizar Gemini: ${error.message}. Revisa la clave, sus límites y la conexión, o selecciona el modo local.`;
+          const providerName = AI_PROVIDERS[els.intelligenceMode.value].name;
+          els.detectorHelp.textContent = `No se pudo utilizar ${providerName}: ${error.message}. Revisa la clave, sus límites y la conexión, o selecciona el modo local.`;
           return;
         }
         rejectedCount++;
@@ -360,12 +414,12 @@
     const confidence = topDetection ? detectionConfidence(topDetection) : 0;
     const detectorLabel = detectionName ? `${escapeHtml(detectionName)}${confidence ? ` ${Math.round(confidence * 100)}%` : ""}` : "Posible organismo";
     const badge = frame.recommended
-      ? `<span class="candidate-badge">${frame.detections.length ? detectorLabel : frame.lifeCandidate ? `Posible vida · ${frame.lifeScore}/100` : "Captura destacada"}</span>`
+      ? `<span class="candidate-badge">${frame.detections.length ? detectorLabel : frame.lifeCandidate ? `Propuesta destacada · ${frame.lifeScore}/100` : "Captura destacada"}</span>`
       : frame.excluded ? `<span class="quality-badge">${frame.exclusionReason}</span>` : "";
     article.innerHTML = `
       <div class="frame-image"><img src="${frame.url}" alt="Fotograma del vídeo en ${formatTime(frame.time)}">${badge}<span class="timestamp">${formatTime(frame.time)}</span></div>
       <div class="frame-info">
-        <div class="quality-row"><span>Calidad ${frame.quality}/100</span><span>Cambio ${frame.change}%</span></div>
+        <div class="quality-row"><span class="metric-help" tabindex="0" data-tooltip="Estimación de 0 a 100 basada en iluminación y nitidez. Una puntuación alta indica que la captura puede ser más fácil de revisar; no confirma que aparezca una especie.">Calidad ${frame.quality}/100 <i>?</i></span><span class="metric-help" tabindex="0" data-tooltip="Diferencia visual respecto al fotograma anterior analizado. Puede deberse a un organismo, al movimiento de la cámara, a partículas o a cambios de luz.">Cambio ${frame.change}% <i>?</i></span></div>
         <div class="frame-actions">
           <button type="button" class="accept ${frame.status === "accepted" ? "active" : ""}">${frame.status === "accepted" ? "✓ Aceptado" : "Aceptar"}</button>
           <button type="button" class="discard ${frame.status === "discarded" ? "active" : ""}">${frame.status === "discarded" ? "× Descartado" : "Descartar"}</button>
@@ -468,15 +522,16 @@
       rows.push(`"${name.split("/").pop()}","${sourceFile.name.replace(/"/g, '""')}",${frame.time.toFixed(2)},${formatTime(frame.time)},${frame.quality},${frame.recommended ? "si" : "no"},${frame.detectorUsed ? "conectado" : "seleccion_local"},${frame.detections.length}`);
       return { name, data: frame.blob };
     });
-    if (els.includeNeighbors.checked) {
+    const previousCount = Math.max(0, Math.min(10, Math.floor(Number(els.previousFramesCount.value) || 0)));
+    const nextCount = Math.max(0, Math.min(10, Math.floor(Number(els.nextFramesCount.value) || 0)));
+    if (previousCount || nextCount) {
       const fps = Number(config.assumedFramesPerSecond) || 30;
       const step = 1 / fps;
       for (let index = 0; index < accepted.length; index++) {
         const frame = accepted[index];
-        const neighbors = [
-          { suffix: "anterior", time: Math.max(0, frame.time - step) },
-          { suffix: "posterior", time: Math.min(els.video.duration - .001, frame.time + step) }
-        ];
+        const neighbors = [];
+        for (let offset = previousCount; offset >= 1; offset--) neighbors.push({ suffix: `anterior_${String(offset).padStart(2, "0")}`, time: Math.max(0, frame.time - step * offset) });
+        for (let offset = 1; offset <= nextCount; offset++) neighbors.push({ suffix: `posterior_${String(offset).padStart(2, "0")}`, time: Math.min(els.video.duration - .001, frame.time + step * offset) });
         for (const neighbor of neighbors) {
           const blob = await captureAtTime(neighbor.time);
           if (!blob) continue;
@@ -488,7 +543,7 @@
     }
     packageFiles.push({ name: "resultados.csv", data: new TextEncoder().encode(rows.join("\n")) });
     packageFiles.push({ name: "INSTRUCCION_PARA_TU_IA.txt", data: new TextEncoder().encode($("myAiPrompt").value) });
-    packageFiles.push({ name: "LEEME.txt", data: new TextEncoder().encode(`Fotogramas extraídos con el procesador de vídeo de YOTO.\nEl campo captura_destacada identifica la selección sugerida por el procesador y requiere revisión humana.\nLos frames de contexto se calculan a ±1/${Number(config.assumedFramesPerSecond) || 30} s del fotograma aceptado.\n`) });
+    packageFiles.push({ name: "LEEME.txt", data: new TextEncoder().encode(`Fotogramas extraídos con el procesador de vídeo de YOTO.\nEl campo captura_destacada identifica la selección sugerida por el procesador y requiere revisión humana.\nFrames de contexto solicitados por captura: ${previousCount} anteriores y ${nextCount} posteriores, calculados en pasos de 1/${Number(config.assumedFramesPerSecond) || 30} s.\n`) });
     const zip = await createZip(packageFiles);
     const url = URL.createObjectURL(zip);
     const link = document.createElement("a");
@@ -572,18 +627,29 @@
   els.process.addEventListener("click", processVideo);
   els.interval.addEventListener("change", () => { els.customIntervalLabel.hidden = els.interval.value !== "custom"; });
   els.intelligenceMode.addEventListener("change", () => {
-    const useAI = els.intelligenceMode.value === "gemini";
-    els.geminiKeyLabel.hidden = !useAI;
+    const provider = AI_PROVIDERS[els.intelligenceMode.value];
+    const useAI = Boolean(provider);
+    els.apiKeyLabel.hidden = !useAI;
     els.aiPrivacyNote.hidden = !useAI;
-    els.detectorStatus.textContent = useAI ? "Análisis automático con Gemini" : "Selección inteligente activada";
+    els.aiApiKey.value = "";
+    els.aiApiKey.type = "password";
+    els.toggleAiKey.textContent = "Ver";
+    if (provider) {
+      els.apiKeyTitle.textContent = `Clave API de ${provider.name}`;
+      els.apiKeyHelp.textContent = provider.keyHelp;
+      els.getApiKeyLink.href = provider.keyUrl;
+      els.getApiKeyLink.textContent = `Obtener una clave de ${provider.name}`;
+    }
+    const useService = els.intelligenceMode.value === "service";
+    els.detectorStatus.textContent = useAI ? `Análisis automático con ${provider.name}` : useService ? "Detector marino de YOTO" : "Selección inteligente activada";
     els.detectorHelp.textContent = useAI
-      ? "Primero se aplica el filtro local y después Gemini analiza las capturas candidatas. Las propuestas siempre deben revisarse."
-      : "Destaca las capturas más nítidas y con cambios relevantes sin enviar imágenes fuera del dispositivo.";
+      ? `Primero se aplica el filtro local y después ${provider.name} analiza las capturas candidatas. Las propuestas siempre deben revisarse.`
+      : useService ? "Los fotogramas candidatos se analizan con el detector institucional configurado por YOTO." : "Destaca las capturas más nítidas y con cambios relevantes sin enviar imágenes fuera del dispositivo.";
   });
-  els.toggleGeminiKey.addEventListener("click", () => {
-    const reveal = els.geminiApiKey.type === "password";
-    els.geminiApiKey.type = reveal ? "text" : "password";
-    els.toggleGeminiKey.textContent = reveal ? "Ocultar" : "Ver";
+  els.toggleAiKey.addEventListener("click", () => {
+    const reveal = els.aiApiKey.type === "password";
+    els.aiApiKey.type = reveal ? "text" : "password";
+    els.toggleAiKey.textContent = reveal ? "Ocultar" : "Ver";
   });
   els.cancel.addEventListener("click", () => { cancelled = true; });
   els.download.addEventListener("click", downloadSelection);
@@ -602,7 +668,7 @@
     option.textContent = "Detector marino de YOTO";
     els.intelligenceMode.appendChild(option);
     els.detectorStatus.textContent = "Detector marino conectado";
-    els.detectorHelp.textContent = "El equipo de YOTO ha configurado un detector marino institucional. También puede seleccionarse Gemini con clave propia.";
+    els.detectorHelp.textContent = "El equipo de YOTO ha configurado un detector marino institucional. También puede seleccionarse Gemini, OpenAI o Claude con una clave propia.";
   }
   if (config.yotoUploadEndpoint) els.sendToYoto.hidden = false;
   if (typeof navigator.share !== "function") {
