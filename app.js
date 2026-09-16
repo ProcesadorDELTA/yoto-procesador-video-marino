@@ -1,17 +1,18 @@
 (() => {
   "use strict";
 
-  const config = Object.assign({ detectorEndpoint: "", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
+  const config = Object.assign({ detectorEndpoint: "", yotoUploadEndpoint: "", maxFileSizeMB: 300, maxDurationSeconds: 900, maxFrames: 240 }, window.YOTO_VIDEO_CONFIG || {});
   const $ = (id) => document.getElementById(id);
   const els = {
     input: $("videoInput"), choose: $("chooseButton"), drop: $("dropzone"), filePanel: $("filePanel"), settings: $("settingsPanel"),
     fileName: $("fileName"), fileMeta: $("fileMeta"), remove: $("removeFile"), process: $("processButton"), interval: $("intervalSelect"),
     customIntervalLabel: $("customIntervalLabel"), customInterval: $("customInterval"), includeNeighbors: $("includeNeighbors"),
     intelligenceMode: $("intelligenceMode"), detectorEndpointInput: $("detectorEndpointInput"), detectorEndpointLabel: $("detectorEndpointLabel"), aiPrivacyNote: $("aiPrivacyNote"),
+    localAiPanel: $("localAiPanel"), ollamaUrl: $("ollamaUrl"), ollamaModel: $("ollamaModel"), testOllama: $("testOllama"), ollamaStatus: $("ollamaStatus"),
     quality: $("qualitySelect"), progress: $("progressPanel"), progressTitle: $("progressTitle"), progressValue: $("progressValue"),
     progressBar: $("progressBar"), progressDetail: $("progressDetail"), cancel: $("cancelButton"), results: $("resultsPanel"),
     gallery: $("gallery"), empty: $("emptyResults"), kept: $("keptCount"), candidates: $("candidateCount"), rejected: $("rejectedCount"),
-    selected: $("selectedCount"), download: $("downloadButton"), acceptCandidates: $("acceptCandidates"), newVideo: $("newVideoButton"),
+    selected: $("selectedCount"), download: $("downloadButton"), sendToYoto: $("sendToYotoButton"), acceptCandidates: $("acceptCandidates"), newVideo: $("newVideoButton"),
     video: $("video"), capture: $("captureCanvas"), analysis: $("analysisCanvas"), detectorStatus: $("detectorStatus"), detectorHelp: $("detectorHelp")
   };
 
@@ -167,6 +168,84 @@
     }
   }
 
+  async function blobToBase64(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    const step = 0x8000;
+    for (let i = 0; i < bytes.length; i += step) binary += String.fromCharCode(...bytes.subarray(i, i + step));
+    return btoa(binary);
+  }
+
+  function normalizeOllamaResult(value) {
+    const items = Array.isArray(value?.detections) ? value.detections : Array.isArray(value?.organisms) ? value.organisms : [];
+    return items.map((item) => ({
+      label: String(item.label || item.name || item.organism || "organismo marino"),
+      confidence: Math.max(0, Math.min(1, Number(item.confidence ?? item.score ?? .5))),
+      bbox: Array.isArray(item.bbox) ? item.bbox : [0, 0, 1, 1]
+    }));
+  }
+
+  async function detectWithOllama(blob) {
+    if (els.intelligenceMode.value !== "ollama") return null;
+    const base = els.ollamaUrl.value.trim().replace(/\/$/, "");
+    const model = els.ollamaModel.value.trim();
+    if (!base || !model) return null;
+    try {
+      const response = await fetch(`${base}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          format: "json",
+          images: [await blobToBase64(blob)],
+          prompt: "Analiza esta captura submarina. Devuelve solo JSON con la forma {\"detections\":[{\"label\":\"grupo u organismo visible\",\"confidence\":0.0}]}. Incluye únicamente organismos marinos realmente visibles. No inventes especie; usa un grupo amplio si hay incertidumbre. Si no hay organismos, devuelve una lista vacía.",
+          options: { temperature: 0 }
+        })
+      });
+      if (!response.ok) throw new Error(`Ollama respondió ${response.status}`);
+      const result = await response.json();
+      const parsed = typeof result.response === "string" ? JSON.parse(result.response) : result.response;
+      return normalizeOllamaResult(parsed);
+    } catch (error) {
+      els.ollamaStatus.textContent = `No se pudo usar Ollama: ${error.message}. Revisa el modelo y OLLAMA_ORIGINS.`;
+      els.ollamaStatus.dataset.state = "error";
+      return null;
+    }
+  }
+
+  async function detectOrganisms(blob, time) {
+    if (els.intelligenceMode.value === "ollama") return detectWithOllama(blob);
+    return detectWithEndpoint(blob, time);
+  }
+
+  async function testOllamaConnection() {
+    const base = els.ollamaUrl.value.trim().replace(/\/$/, "");
+    els.testOllama.disabled = true;
+    els.ollamaStatus.textContent = "Comprobando Ollama…";
+    els.ollamaStatus.dataset.state = "pending";
+    try {
+      const response = await fetch(`${base}/api/tags`);
+      if (!response.ok) throw new Error(`respuesta ${response.status}`);
+      const result = await response.json();
+      const models = (result.models || []).map((item) => item.name || item.model).filter(Boolean);
+      const selected = els.ollamaModel.value.trim();
+      if (!models.length) throw new Error("no hay modelos instalados");
+      if (!models.some((name) => name === selected || name.startsWith(`${selected}:`))) {
+        els.ollamaStatus.textContent = `Conexión correcta. Modelo solicitado no encontrado. Disponibles: ${models.join(", ")}.`;
+        els.ollamaStatus.dataset.state = "warning";
+      } else {
+        els.ollamaStatus.textContent = `Conexión correcta. ${selected} está listo para analizar capturas.`;
+        els.ollamaStatus.dataset.state = "success";
+      }
+    } catch (error) {
+      els.ollamaStatus.textContent = `Sin conexión: ${error.message}. Comprueba que Ollama está abierto y que OLLAMA_ORIGINS permite esta web.`;
+      els.ollamaStatus.dataset.state = "error";
+    } finally {
+      els.testOllama.disabled = false;
+    }
+  }
+
   async function canvasBlob(canvas, quality = .9) {
     return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
   }
@@ -202,7 +281,17 @@
       els.detectorEndpointInput.reportValidity();
       return;
     }
+    if (els.intelligenceMode.value === "ollama" && (!els.ollamaUrl.value.trim() || !els.ollamaModel.value.trim())) {
+      els.settings.hidden = false;
+      els.progress.hidden = true;
+      const field = !els.ollamaUrl.value.trim() ? els.ollamaUrl : els.ollamaModel;
+      field.setCustomValidity("Completa la dirección y el modelo de Ollama.");
+      field.reportValidity();
+      return;
+    }
     els.detectorEndpointInput.setCustomValidity("");
+    els.ollamaUrl.setCustomValidity("");
+    els.ollamaModel.setCustomValidity("");
     const thresholds = { low: 28, medium: 40, high: 55 };
     const qualityThreshold = thresholds[els.quality.value];
     const duration = els.video.duration;
@@ -234,7 +323,7 @@
         if (excluded) rejectedCount++;
         const blob = await canvasBlob(els.capture);
         if (!blob) continue;
-        const detections = excluded ? null : await detectWithEndpoint(blob, time);
+        const detections = excluded ? null : await detectOrganisms(blob, time);
         const marineDetections = (detections || []).filter(isMarineDetection).sort((a, b) => detectionConfidence(b) - detectionConfidence(a));
         const detected = marineDetections.length > 0;
         const visualCandidate = analysis.difference > .16 && analysis.quality >= qualityThreshold + 4;
@@ -417,6 +506,29 @@
     els.download.textContent = "Descargar selección (.zip)";
   }
 
+  async function sendSelectionToYoto() {
+    const accepted = frames.filter((frame) => frame.status === "accepted");
+    if (!accepted.length || !config.yotoUploadEndpoint) return;
+    els.sendToYoto.disabled = true;
+    els.sendToYoto.textContent = "Enviando a YOTO…";
+    try {
+      for (const frame of accepted) {
+        const body = new FormData();
+        body.append("image", frame.blob, `${sourceFile.name.replace(/\.[^.]+$/, "")}_${Math.round(frame.time * 1000)}.jpg`);
+        body.append("source_video_name", sourceFile.name);
+        body.append("timestamp_seconds", String(frame.time));
+        body.append("quality_score", String(frame.quality));
+        body.append("detections", JSON.stringify(frame.detections));
+        const response = await fetch(config.yotoUploadEndpoint, { method: "POST", body, credentials: "include" });
+        if (!response.ok) throw new Error(`YOTO respondió ${response.status}`);
+      }
+      els.sendToYoto.textContent = `${accepted.length} capturas enviadas`;
+    } catch (error) {
+      els.sendToYoto.textContent = `Error al enviar: ${error.message}`;
+      els.sendToYoto.disabled = false;
+    }
+  }
+
   els.choose.addEventListener("click", (event) => { event.stopPropagation(); els.input.click(); });
   $("copyAiPrompt").addEventListener("click", async () => {
     try {
@@ -440,15 +552,20 @@
   els.interval.addEventListener("change", () => { els.customIntervalLabel.hidden = els.interval.value !== "custom"; });
   els.intelligenceMode.addEventListener("change", () => {
     const useAI = els.intelligenceMode.value === "ai";
+    const useOllama = els.intelligenceMode.value === "ollama";
     els.detectorEndpointLabel.hidden = !useAI;
     els.aiPrivacyNote.hidden = !useAI;
-    els.detectorStatus.textContent = useAI ? "IA marina preparada" : "Selección inteligente activada";
+    els.localAiPanel.hidden = !useOllama;
+    els.detectorStatus.textContent = useAI ? "IA marina preparada" : useOllama ? "IA local del usuario" : "Selección inteligente activada";
     els.detectorHelp.textContent = useAI
       ? "Los fotogramas válidos se enviarán al servicio configurado para localizar peces y otros organismos marinos."
+      : useOllama ? "Ollama analizará las capturas válidas con el modelo visual instalado en este ordenador. La identificación propuesta requiere revisión humana."
       : "Destaca las capturas más nítidas y con cambios relevantes sin enviar imágenes fuera del dispositivo.";
   });
+  els.testOllama.addEventListener("click", testOllamaConnection);
   els.cancel.addEventListener("click", () => { cancelled = true; });
   els.download.addEventListener("click", downloadSelection);
+  els.sendToYoto.addEventListener("click", sendSelectionToYoto);
   els.acceptCandidates.addEventListener("click", () => { frames.forEach((frame) => { if (frame.recommended) frame.status = "accepted"; }); render(); });
   document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll(".filter").forEach((item) => item.classList.remove("active"));
@@ -465,6 +582,7 @@
     els.detectorStatus.textContent = "Detector marino conectado";
     els.detectorHelp.textContent = "Prioriza fotogramas con peces y otros organismos marinos detectados por el modelo configurado.";
   }
+  if (config.yotoUploadEndpoint) els.sendToYoto.hidden = false;
 
   if (document.modelContext?.registerTool) {
     document.modelContext.registerTool({
