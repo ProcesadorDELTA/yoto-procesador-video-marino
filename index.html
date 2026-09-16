@@ -5,24 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Procesador de Vídeo Submarino | YOTO</title>
   <meta name="description" content="Extrae y revisa fotogramas de vídeos submarinos para su posterior identificación en YOTO.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23082f49'/%3E%3Cpath d='M12 33c9-12 16-12 25 0-9 12-16 12-25 0Zm25 0 13-9v18Z' fill='%232dd4bf'/%3E%3Ccircle cx='27' cy='30' r='2.5' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#main" aria-label="YOTO, ir al procesador">
+    <a class="brand" href="https://yoto.plocan.eu/" aria-label="Ir a la plataforma YOTO">
       <img class="brand-logo" src="./yoto-horizontal.png" alt="YOTO">
       <span class="platform-name"><strong>Plataforma de identificación de biodiversidad marina</strong><small>You Only Tag Once (YOTO)</small></span>
     </a>
-    <div class="privacy-pill"><span aria-hidden="true">●</span> Procesamiento local en el navegador</div>
+    <nav class="top-actions" aria-label="Acciones de la plataforma">
+      <a class="home-link" href="https://yoto.plocan.eu/">Volver a YOTO</a>
+      <div class="privacy-pill"><span aria-hidden="true">●</span> Vídeo privado</div>
+    </nav>
   </header>
 
-  <main id="main" class="shell">
-    <section class="intro">
-      <p class="eyebrow">NUEVA HERRAMIENTA</p>
-      <h1>Procesador de Vídeo Submarino</h1>
-      <p>Selecciona un vídeo para obtener capturas con el intervalo que elijas y revisar después las imágenes destacadas por el procesador.</p>
-    </section>
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-grid" aria-hidden="true"></div>
+    <div class="shell hero-content">
+      <p class="eyebrow"><span></span> HERRAMIENTA DE CIENCIA CIUDADANA</p>
+      <h1 id="page-title">Procesador de<br><em>Vídeo Submarino</em></h1>
+      <p>Convierte vídeos cortos en capturas listas para revisar e identificar en YOTO. El vídeo se procesa en este dispositivo y solo salen las imágenes que tú decidas.</p>
+      <div class="hero-features" aria-label="Características principales">
+        <span>Sin instalar nada</span><span>Revisión humana</span><span>Mac y Windows</span>
+      </div>
+    </div>
+  </section>
+
+  <main id="main" class="shell main-shell">
 
     <section class="workspace" aria-labelledby="upload-title">
       <div class="step-label"><span>1</span> Seleccionar vídeo</div>
@@ -74,6 +87,7 @@
             <span>Motor de selección inteligente</span>
             <select id="intelligenceMode">
               <option value="local" selected>Selección local · privada</option>
+              <option value="ollama">Mi IA local · Ollama</option>
               <option value="ai">IA marina · mediante servicio seguro</option>
             </select>
           </label>
@@ -83,6 +97,20 @@
           </label>
         </div>
         <p id="aiPrivacyNote" class="field-note" hidden>La web enviará únicamente los fotogramas analizados a esta URL. No introduzcas una clave API: debe guardarse de forma segura en el servidor.</p>
+        <section id="localAiPanel" class="local-ai-panel" hidden aria-labelledby="local-ai-title">
+          <div class="local-ai-heading">
+            <div><span class="kicker">IA DEL USUARIO</span><h3 id="local-ai-title">Usar Ollama en este ordenador</h3></div>
+            <span class="free-badge">GRATUITO Y LOCAL</span>
+          </div>
+          <p>Conecta el procesador con un modelo visual instalado en tu Mac o PC. Las capturas se analizan en el equipo y no necesitas una clave API.</p>
+          <div class="local-ai-fields">
+            <label><span>Dirección de Ollama</span><input id="ollamaUrl" type="url" value="http://localhost:11434" spellcheck="false"></label>
+            <label><span>Modelo visual</span><input id="ollamaModel" type="text" value="gemma3:4b" placeholder="gemma3:4b" spellcheck="false"></label>
+            <button id="testOllama" class="button secondary" type="button">Comprobar conexión</button>
+          </div>
+          <p id="ollamaStatus" class="connection-status" role="status">Instala Ollama y descarga un modelo visual antes de comprobar la conexión.</p>
+          <details class="setup-help"><summary>Configuración rápida para Mac y Windows</summary><ol><li>Instala <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama</a>.</li><li>Abre Terminal o PowerShell y ejecuta <code>ollama pull gemma3:4b</code>.</li><li>Autoriza el origen <code>https://procesadordelta.github.io</code> mediante <code>OLLAMA_ORIGINS</code> y reinicia Ollama.</li><li>Vuelve aquí y pulsa <strong>Comprobar conexión</strong>.</li></ol></details>
+        </section>
         <div class="engine-note">
           <span class="engine-icon" aria-hidden="true">◎</span>
           <div><strong id="detectorStatus">Selección inteligente activada</strong><p id="detectorHelp">Destaca las capturas más nítidas y con cambios relevantes. Para reconocer organismos de forma real, conecta el detector marino indicado en la guía.</p></div>
@@ -125,7 +153,7 @@
       <div id="gallery" class="gallery"></div>
       <div id="emptyResults" class="empty-results" hidden>No hay imágenes en este filtro.</div>
       <details class="my-ai">
-        <summary>Usar mi IA · sin claves API</summary>
+        <summary>Alternativa manual · usar otra IA sin conectar cuentas</summary>
         <p>Acepta las capturas que quieras revisar, descarga la selección y descomprime el ZIP. Adjunta las imágenes en la IA que uses habitualmente y copia esta instrucción. Necesitas una IA que admita imágenes; revisa sus límites de archivos.</p>
         <textarea id="myAiPrompt" rows="5" readonly aria-label="Instrucción para tu IA">Revisa estas capturas submarinas. Indica qué imágenes muestran peces u otros organismos marinos y cuáles permiten observarlos mejor. Cita el nombre de cada archivo, describe los organismos visibles y explica la incertidumbre. No inventes especies: si no hay evidencia suficiente, usa un grupo amplio. Devuelve una tabla con archivo, organismos visibles, calidad para identificación y observaciones. Esta revisión requiere validación humana.</textarea>
         <button id="copyAiPrompt" class="button secondary" type="button">Copiar instrucción</button>
@@ -136,12 +164,12 @@
       <div class="export-bar">
         <div class="export-copy"><strong id="selectedCount">0 fotogramas aceptados</strong><span>Incluye imágenes y un CSV con los tiempos del vídeo.</span></div>
         <label class="neighbor-option"><input id="includeNeighbors" type="checkbox"> <span>Exportar también el frame anterior y posterior</span></label>
-        <button id="downloadButton" class="button action" type="button" disabled>Descargar selección (.zip)</button>
+        <div class="export-actions"><button id="sendToYotoButton" class="button yoto-send" type="button" hidden>Enviar capturas a YOTO</button><button id="downloadButton" class="button action" type="button" disabled>Descargar selección (.zip)</button></div>
       </div>
     </section>
   </main>
 
-  <footer><span>Prototipo de integración para YOTO · PLOCAN</span><span>El vídeo permanece en este dispositivo.</span></footer>
+  <footer><span><strong>YOTO</strong> · Plataforma de identificación de biodiversidad marina</span><span>Prototipo de integración para PLOCAN · El vídeo permanece en este dispositivo.</span></footer>
   <video id="video" preload="metadata" muted playsinline hidden></video>
   <canvas id="captureCanvas" hidden></canvas>
   <canvas id="analysisCanvas" width="160" height="90" hidden></canvas>
