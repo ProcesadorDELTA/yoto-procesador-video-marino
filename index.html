@@ -87,7 +87,9 @@
             <span>Motor de selección inteligente</span>
             <select id="intelligenceMode">
               <option value="local" selected>Selección local · privada</option>
-              <option value="gemini">Analizar con Gemini · clave propia</option>
+              <option value="gemini">Analizar con Gemini · clave API propia</option>
+              <option value="openai">Analizar con OpenAI · clave API propia</option>
+              <option value="claude">Analizar con Claude · clave API propia</option>
             </select>
           </label>
           <label class="life-filter-option">
@@ -95,13 +97,13 @@
             <span class="check-control"><input id="prioritizeLife" type="checkbox" checked> Buscar movimiento localizado y formas destacadas</span>
             <small>Experimental y sin IA: ayuda a encontrar posible fauna, pero también puede marcar algas, partículas o movimiento de cámara.</small>
           </label>
-          <label id="geminiKeyLabel" hidden>
-            <span>Clave API de Gemini</span>
-            <span class="secret-input"><input id="geminiApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí tu clave API"><button id="toggleGeminiKey" type="button" aria-label="Mostrar u ocultar la clave">Ver</button></span>
-            <small>La clave se conserva solo mientras esta pestaña permanece abierta. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Obtener una clave en Google AI Studio</a>.</small>
+          <label id="apiKeyLabel" hidden>
+            <span id="apiKeyTitle">Clave API</span>
+            <span class="secret-input"><input id="aiApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí tu clave API"><button id="toggleAiKey" type="button" aria-label="Mostrar u ocultar la clave">Ver</button></span>
+            <small><span id="apiKeyHelp">La clave se conserva solo mientras esta pestaña permanece abierta.</span> <a id="getApiKeyLink" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Obtener una clave</a>.</small>
           </label>
         </div>
-        <p id="aiPrivacyNote" class="field-note" hidden>Solo las capturas que superen el filtro local se enviarán a Gemini para proponer organismos o especies. La clave no se guarda en el navegador ni se incorpora a las descargas. El uso puede estar sujeto a límites o costes de Google.</p>
+        <p id="aiPrivacyNote" class="field-note" hidden>Solo las capturas que superen el filtro local se enviarán al proveedor elegido. La clave no se guarda ni se incorpora a las descargas. Esta conexión directa es para pruebas con una clave personal; una futura clave institucional deberá protegerse en el servidor de YOTO. Las cuentas de ChatGPT, Gemini o Claude no incluyen necesariamente acceso API y el uso puede tener límites o costes.</p>
         <div class="engine-note">
           <span class="engine-icon" aria-hidden="true">◎</span>
           <div><strong id="detectorStatus">Selección inteligente activada</strong><p id="detectorHelp">Destaca las capturas más nítidas y con cambios relevantes sin utilizar una IA de pago.</p></div>
@@ -160,7 +162,11 @@
 
       <div class="export-bar">
         <div class="export-copy"><strong id="selectedCount">0 fotogramas aceptados</strong><span>Incluye imágenes y un CSV con los tiempos del vídeo.</span></div>
-        <label class="neighbor-option"><input id="includeNeighbors" type="checkbox"> <span>Exportar también el frame anterior y posterior</span></label>
+        <fieldset class="neighbor-option">
+          <legend>Frames de contexto por cada captura</legend>
+          <label><span>Anteriores</span><input id="previousFramesCount" type="number" min="0" max="10" step="1" value="0" inputmode="numeric"></label>
+          <label><span>Posteriores</span><input id="nextFramesCount" type="number" min="0" max="10" step="1" value="0" inputmode="numeric"></label>
+        </fieldset>
         <div class="export-actions"><button id="sendToYotoButton" class="button yoto-send" type="button" hidden>Enviar capturas a YOTO</button><button id="downloadButton" class="button action" type="button" disabled>Descargar selección (.zip)</button></div>
       </div>
     </section>
