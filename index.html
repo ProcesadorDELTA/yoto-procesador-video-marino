@@ -87,7 +87,7 @@
             <span>Motor de selección inteligente</span>
             <select id="intelligenceMode">
               <option value="local" selected>Selección local · privada</option>
-              <option value="ai">IA marina · mediante servicio seguro</option>
+              <option value="gemini">Analizar con Gemini · clave propia</option>
             </select>
           </label>
           <label class="life-filter-option">
@@ -95,15 +95,16 @@
             <span class="check-control"><input id="prioritizeLife" type="checkbox" checked> Buscar movimiento localizado y formas destacadas</span>
             <small>Experimental y sin IA: ayuda a encontrar posible fauna, pero también puede marcar algas, partículas o movimiento de cámara.</small>
           </label>
-          <label id="detectorEndpointLabel" hidden>
-            <span>URL del servicio de IA</span>
-            <input id="detectorEndpointInput" type="url" placeholder="https://tu-servidor.es/api/detectar">
+          <label id="geminiKeyLabel" hidden>
+            <span>Clave API de Gemini</span>
+            <span class="secret-input"><input id="geminiApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí tu clave API"><button id="toggleGeminiKey" type="button" aria-label="Mostrar u ocultar la clave">Ver</button></span>
+            <small>La clave se conserva solo mientras esta pestaña permanece abierta. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Obtener una clave en Google AI Studio</a>.</small>
           </label>
         </div>
-        <p id="aiPrivacyNote" class="field-note" hidden>La web enviará únicamente los fotogramas analizados a esta URL. No introduzcas una clave API: debe guardarse de forma segura en el servidor.</p>
+        <p id="aiPrivacyNote" class="field-note" hidden>Solo las capturas que superen el filtro local se enviarán a Gemini para proponer organismos o especies. La clave no se guarda en el navegador ni se incorpora a las descargas. El uso puede estar sujeto a límites o costes de Google.</p>
         <div class="engine-note">
           <span class="engine-icon" aria-hidden="true">◎</span>
-          <div><strong id="detectorStatus">Selección inteligente activada</strong><p id="detectorHelp">Destaca las capturas más nítidas y con cambios relevantes. Para reconocer organismos de forma real, conecta el detector marino indicado en la guía.</p></div>
+          <div><strong id="detectorStatus">Selección inteligente activada</strong><p id="detectorHelp">Destaca las capturas más nítidas y con cambios relevantes sin utilizar una IA de pago.</p></div>
         </div>
         <button id="processButton" class="button action" type="button">
           <span aria-hidden="true">◉</span> Procesar vídeo
