@@ -8,7 +8,16 @@ La marca **Captura destacada** procede de una comparación de calidad y cambios 
 
 La opción **Buscar movimiento localizado y formas destacadas** divide la imagen de análisis en una cuadrícula y favorece cambios concentrados en pocas zonas, combinados con nitidez suficiente. Es un filtro clásico de imagen, no un reconocimiento de especies. El movimiento de cámara, las algas y las partículas pueden producir falsos positivos, mientras que los organismos inmóviles pueden pasar inadvertidos.
 
-## 2. Conectar el detector marino
+## 2. Modalidades de análisis disponibles
+
+La interfaz presenta dos opciones comprensibles para el público:
+
+1. **Selección local privada:** no utiliza IA ni envía imágenes. Prioriza nitidez, diferencias visuales y movimiento localizado.
+2. **Analizar con Gemini · clave propia:** el usuario pega una clave de Google AI Studio. La clave permanece únicamente en la memoria de la pestaña; no se guarda en cookies, almacenamiento local, archivos ni descargas. El filtro local reduce previamente las capturas que se envían.
+
+Además, el usuario puede aceptar capturas, descargarlas o compartirlas y abrir ChatGPT, Gemini o Claude para realizar una revisión manual con su cuenta habitual.
+
+## 3. Conectar en el futuro un detector institucional de YOTO
 
 En `dist/config.js`, asignar la URL del servicio:
 
@@ -16,6 +25,7 @@ En `dist/config.js`, asignar la URL del servicio:
 window.YOTO_VIDEO_CONFIG = {
   detectorEndpoint: "/api/video/detect-frame",
   yotoUploadEndpoint: "/api/video/import-frame",
+  geminiModel: "gemini-2.5-flash",
   maxFileSizeMB: 300,
   maxDurationSeconds: 900,
   maxFrames: 240,
@@ -23,7 +33,7 @@ window.YOTO_VIDEO_CONFIG = {
 };
 ```
 
-El navegador enviará una petición `POST multipart/form-data` por cada fotograma que supere los filtros locales:
+Cuando `detectorEndpoint` tiene valor, la interfaz añade automáticamente **Detector marino de YOTO**. El usuario no tiene que introducir una URL. El navegador enviará una petición `POST multipart/form-data` por cada fotograma candidato que supere los filtros locales:
 
 | Campo | Tipo | Contenido |
 | --- | --- | --- |
@@ -48,7 +58,7 @@ Respuesta esperada:
 
 `assumedFramesPerSecond` se usa para calcular los frames de contexto inmediatamente anterior y posterior (`±1/fps`). Debe ajustarse a 25, 30, 50 o 60 según los vídeos de la campaña para máxima precisión.
 
-## 3. Servicio recomendado
+## 4. Servicio institucional recomendado
 
 El endpoint puede implementarse como un servicio Python separado del núcleo de YOTO:
 
@@ -65,9 +75,9 @@ Tras seleccionar y descargar los fotogramas, la interfaz permite copiar una inst
 
 En navegadores compatibles, la Web Share API permite compartir directamente hasta 20 capturas aceptadas con una aplicación instalada o servicio ofrecido por el sistema. Como los destinos dependen del dispositivo y del navegador, esta función es complementaria y no sustituye a la descarga ZIP.
 
-Una página estática no debe pedir ni conservar claves de OpenAI, Google o Anthropic. Si YOTO requiere automatización completa, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
+La demostración permite una clave propia de Gemini exclusivamente en memoria para facilitar la prueba. No debe incorporarse una clave institucional en `config.js` ni en el repositorio. Si YOTO requiere automatización estable, las llamadas deben realizarse desde un backend propio que almacene las credenciales como secretos, controle costes y aplique las condiciones de protección de datos. Las propuestas de identificación siempre requieren validación humana.
 
-## 4. Integración con el etiquetado existente
+## 5. Integración con el etiquetado existente
 
 En producción, al configurar `yotoUploadEndpoint`, aparece **Enviar capturas a YOTO**. El frontend envía solo los fotogramas aceptados como `multipart/form-data`, con los campos `image`, `source_video_name`, `timestamp_seconds`, `quality_score` y `detections`.
 
@@ -83,14 +93,16 @@ En producción, al configurar `yotoUploadEndpoint`, aparece **Enviar capturas a 
 
 Cada imagen debería crearse como un registro pendiente de identificación y vincularse al usuario autenticado. La versión de demostración deja el endpoint vacío hasta que el equipo de YOTO indique la ruta y su contrato. Se recomienda mantener la validación humana incluso cuando el detector devuelva una categoría.
 
-## 5. Privacidad y límites
+## 6. Privacidad y límites
 
 - El prototipo no almacena vídeos ni imágenes.
+- La clave Gemini introducida por el usuario no se persiste y se elimina al cerrar o recargar la pestaña.
+- En modo Gemini, únicamente se envían al proveedor las capturas candidatas; deben revisarse sus condiciones de privacidad y uso.
 - En la integración, puede conservarse únicamente cada fotograma aceptado.
 - Si YOTO recibe vídeos completos, se recomienda borrarlos automáticamente tras el procesamiento.
 - Los límites se encuentran en `config.js` y también deben validarse en el servidor.
 
-## 6. Decisiones pendientes para producción
+## 7. Decisiones pendientes para producción
 
 - Tecnología actual del backend de YOTO.
 - Sistema de usuarios y permisos.
